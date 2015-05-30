@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <parse.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 #define APP_ID "nY0HiZQtocZRfntFhdlDdfs03aChMAq68WGxtny9"
@@ -30,11 +31,22 @@
 void myPushCallback(ParseClient client, int error, const char *buffer) {
 	if (error == 0 && buffer != NULL) {
 		if (strstr(buffer, "calendar") != NULL) {
+			char pcmd[100] = "node calendar.js ";
+			char *token, bcp[200];
+			strcpy(bcp,buffer);
+			token = strtok(bcp, ","); // flush the first one
+			token = strtok(NULL,",");
+			while (token != NULL) {
+				strcat(pcmd, token);
+				token = strtok(NULL,",");
+			}
+			char *pcmdptr = strtok(pcmd,"+");
+			
 			printf("received push, -calendar-, now call Google API\n");
+			//printf(pcmdptr);
+			system(pcmdptr);
 			
-			system("node calendar.js");
-			
-			printf("Now speak it out\n");
+			printf("Now read it out\n");
 			system("./speech.sh $(cat calendar.txt)");
 			
 			printf("query top news from New York Times\n");
@@ -42,9 +54,16 @@ void myPushCallback(ParseClient client, int error, const char *buffer) {
 			
 			printf("read out news\n");
 			system("./speech.sh $(cat news.txt)");
+			
+			printf("reminder\n");
+			system("./speech.sh $(cat reminder.txt)");
 		}
 		else if(strstr(buffer, "weather") != NULL){
 			printf("received push, -weather-, now call weather API\n");
+			
+			system("node weather.js");
+			printf("Now read it out\n");
+			system("./speech.sh $(cat weather.txt)");
 		}
 	}
 }

@@ -4,6 +4,8 @@ var google = require('googleapis');
 var googleAuth = require('google-auth-library');
 var calendar = google.calendar('v3');
 var moment = require('moment');
+var gm = require('googlemaps');
+//var fs = require('fs');
 
 var SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 var TOKEN_DIR = (process.env.HOME || process.env.HOMEPATH ||
@@ -102,14 +104,18 @@ function storeToken(token) {
 function getEvents(auth) {
 
 	var today = moment().format('LT');
-	console.log('today: %s', today);
+	//console.log('today: %s', today);
 	var txt = '';
+	var reminder = '';
+	var location = '';
+	var time = 0;
+	//var eventHour = '';
 	calendar.events.list({
 		auth: auth,
 		calendarId: 'primary',
 		singleEvents: true,
 		timeMin: (new Date()).toISOString(),
-		timeMax: (new Date(new Date().getTime() + 2 * 24 * 60 * 60 * 1000)).toISOString(),
+		timeMax: (new Date(new Date().getTime() + 24 * 60 * 60 * 1000)).toISOString(),
 		maxResults: 10,
 		orderBy: 'startTime'
 	}, function(err, response) {
@@ -122,14 +128,14 @@ function getEvents(auth) {
 			console.log('No upcoming events found.');
 		} else {
 			var currentHour = moment().hour();
-			if (moment().hour() < 11) {
-				txt += 'Good Morning \n';
+			if (moment().hour() < 11 && moment().hour() > 4) {
+				txt += 'Good Morning ' + process.argv.slice(2) +'\n';
 			} else if (moment().hour() > 14 && moment().hour() < 16) {
-				txt += 'Good Afternoon \n';
+				txt += 'Good Afternoon ' + process.argv.slice(2) + '\n';
 			} else if (moment().hour() > 18) {
-				txt += 'Good Evening \n';
+				txt += 'Good Evening ' + process.argv.slice(2) + '\n';
 			} else {
-				txt += 'Hello! \n';
+				txt += 'Hello! ' + process.argv.slice(2) + '\n';
 			}
 
 			if (currentHour > 12) {
@@ -139,6 +145,9 @@ function getEvents(auth) {
 			}
 			txt += 'The Current time is ' + currentHour + ' ';
 			if (moment().minute() !== 0) {
+				if (moment().minute() < 10) {
+					txt += ' o ';
+				}
 				txt += moment().minute() + ' \n';
 			}
 			txt += '. Today you have ' + events.length + ' events scheduled. \n';
@@ -148,14 +157,12 @@ function getEvents(auth) {
 				var date = new Date(start);
 				var hours = date.getHours();
 
-
 				if (hours === 0) {
 					if (date.getMinutes() !== 0) {
 						txt += 'At 12 ' + date.getMinutes() + ' am you have an event, ' + event.summary + '.\n';
 					} else {
 						txt += 'At midnight you have an event, ' + event.summary + '.\n';
 					}
-
 				} else if (hours < 12) {
 					if (date.getMinutes() !== 0) {
 						txt += 'At ' + hours + ' ' + date.getMinutes() + ' am you have an event, ' + event.summary + '.\n';
@@ -173,13 +180,14 @@ function getEvents(auth) {
 					if (date.getMinutes() !== 0) {
 						txt += 'At ' + tempHour + ' ' + date.getMinutes() + ' pm you have an event, ' + event.summary + '.\n';
 					} else {
-						txt += 'At ' + tempHour + ' pm you have an event, ' + event.summary + '.\n';
+						txt += 'At ' + tempHour + ' pm you have, ' + event.summary + '.\n';
 					}
 				}
-
 			}
-			console.log(txt);
-			var fs = require('fs');
+
+			setReminder(events[0]);
+			//console.log(txt);
+
 			fs.writeFile("calendar.txt", txt, function(err) {
 				if (err) {
 					return console.log(err);
@@ -187,6 +195,87 @@ function getEvents(auth) {
 
 				console.log("The file was saved! ");
 			});
+
+
 		}
 	});
+}
+
+function setReminder(event) {
+	var eventTime = '';
+	var reminder = '';
+	var tmp = new Date(event.start.dateTime);
+	time = tmp.getHours();
+	if (time === 0) {
+		time = 12;
+	} else if (time > 12) {
+		time -= 12;
+	}
+	eventTime += time + ' ';
+	if (tmp.getMinutes() !== 0) {
+		eventTime += tmp.getMinutes();
+	} else {
+		eventTime += ' o clock ';
+	}
+
+	var timeTil = '';
+	var diff = Math.abs(new Date(event.start.dateTime) - new Date());
+	console.log(new Date(event.start.dateTime));
+	console.log(new Date());
+	console.log(diff);
+	var diffHours = Math.floor(diff / (1000 * 3600));
+	var diffMin = Math.ceil(diff / (1000 * 60)) - diffHours * 60;
+	if (diffHours !== 0) {
+		timeTil += diffHours + ' hours and ';
+	}
+	if (diffMin !== 0) {
+		timeTil += diffMin + ' minutes ';
+	}
+	reminder = '. Finally, we would like to remind you that your next event, ' + event.summary;
+	reminder += ' is scheduled in ' + timeTil + ' at ' + eventTime + ' ';
+
+	if (event.location) { //if there is a location
+		var loc = event.location.toString();
+		//console.log('blahblahb' +loc.toStr;loc.split(",", 1)
+		location = ' at ' + loc.split(",", 1) + ". ";
+		var duration;
+		gm.directions('7414 Hollister Avenue, Goleta, CA 93117', event.location, function(err, data) {
+			duration = data.routes[0].legs[0].duration.value; //.legs[0].departure_time);
+
+			var durMinutes = Math.ceil(duration / 60);
+			var depart = duration + 600;
+			var t = new Date(new Date(event.start.dateTime) - depart * 1000);
+			//console.log(t.getTime());
+			var departTime = t.getHours();
+			depart = Math.ceil(depart / 60);
+			if (departTime === 0) {
+				departTime = 12;
+			} else if (departTime > 12) {
+				departTime -= 12;
+			}
+			location += ' Travel time is estimated at ' + durMinutes + ' minutes.';
+			location += ' We suggest departing ' + depart + ' minutes early, at ' + departTime;
+			if (t.getMinutes() !== 0) {
+				location += ' ' + t.getMinutes();
+			} else {
+				location += ' o clock';
+			}
+			reminder += location + '. \n';
+			console.log(reminder);
+			fs.writeFile("reminder.txt", reminder, function(err) {
+				if (err) {
+					return console.log(err);
+				}
+				console.log("Reminder file was saved!");
+			});
+		});
+	} else {
+		console.log(reminder);
+		fs.writeFile("reminder.txt", reminder, function(err) {
+			if (err) {
+				return console.log(err);
+			}
+			console.log("Reminder file was saved!");
+		});
+	}
 }

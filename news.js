@@ -18,7 +18,7 @@ callback = function(response) {
 	response.on('end', function() {
 		var newsJson = JSON.parse(str);
 		var outputStr = 'I have fetched the following top news from New York Times for you.\n';
-		for (i = 0; i < 5; i++) {
+		for (i = 0; i < 3; i++) {
 			outputStr += 'News ' + (i+1) + ': ' + newsJson.results[i].title + '. \n' + newsJson.results[i].abstract + '. \n';
 		}
 
