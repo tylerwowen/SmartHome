@@ -4,7 +4,7 @@ OBJS = $(SRCS:.c=.o)
 INCLUDES =
 LIBDIRS =
 LIBS = -lparse
-TARGET = quickstart
+TARGET = gio
 
 all: $(TARGET)
 
